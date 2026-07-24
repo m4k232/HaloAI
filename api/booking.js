@@ -12,7 +12,19 @@ export default async function handler(req, res) {
 
     const bookingId = 'HALO-' + Math.floor(100000 + Math.random() * 900000);
     const createdAt = new Date().toISOString();
-    const formattedDate = datetime ? new Date(datetime).toLocaleString('pl-PL') : 'Nieokreślony czas';
+
+    // Safely format datetime (handles ISO dates, raw text like "понедельник 15:00", etc.)
+    let formattedDate = 'Nieokreślony czas';
+    if (datetime) {
+      const parsedDate = new Date(datetime);
+      if (!isNaN(parsedDate.getTime())) {
+        formattedDate = parsedDate.toLocaleString('pl-PL', {
+          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+      } else {
+        formattedDate = String(datetime);
+      }
+    }
 
     const results = {
       telegram: false,
