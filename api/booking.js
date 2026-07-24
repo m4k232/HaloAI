@@ -12,6 +12,7 @@ export default async function handler(req, res) {
 
     const bookingId = 'HALO-' + Math.floor(100000 + Math.random() * 900000);
     const createdAt = new Date().toISOString();
+    const formattedDate = datetime ? new Date(datetime).toLocaleString('pl-PL') : 'Nieokreślony czas';
 
     const results = {
       telegram: false,
@@ -22,52 +23,42 @@ export default async function handler(req, res) {
     const chatId = process.env.TELEGRAM_CHAT_ID;
     const projectId = process.env.FIREBASE_PROJECT_ID;
 
-    // 1. Try Firestore Database write if credentials are present
-    if (projectId && process.env.FIREBASE_PRIVATE_KEY) {
+    // 1. Save to Firestore via REST API (Zero-dependency, 100% reliable on Vercel)
+    if (projectId) {
       try {
-        const adminModule = await import('firebase-admin');
-        const admin = adminModule.default || adminModule;
-        
-        let privateKey = process.env.FIREBASE_PRIVATE_KEY;
-        const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+        const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/bookings?documentId=${bookingId}`;
+        const firestoreDoc = {
+          fields: {
+            bookingId: { stringValue: bookingId },
+            action: { stringValue: action.toUpperCase() },
+            status: { stringValue: action === 'cancel' ? 'cancelled' : 'confirmed' },
+            name: { stringValue: String(name) },
+            phone: { stringValue: String(phone) },
+            service: { stringValue: String(service || 'Usługa podstawowa') },
+            datetime: { stringValue: String(formattedDate) },
+            language: { stringValue: String(language || 'pl') },
+            createdAt: { stringValue: createdAt }
+          }
+        };
 
-        if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
-          privateKey = privateKey.slice(1, -1);
-        }
-        privateKey = privateKey.replace(/\\n/g, '\n');
+        const fsRes = await fetch(firestoreUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(firestoreDoc)
+        });
 
-        if (!admin.apps.length) {
-          admin.initializeApp({
-            credential: admin.credential.cert({
-              projectId,
-              clientEmail,
-              privateKey
-            })
-          });
+        if (fsRes.ok) {
+          results.firestore = true;
+        } else {
+          console.error('Firestore REST API response:', await fsRes.text());
         }
-        const db = admin.firestore();
-        await db.collection('bookings').doc(bookingId).set({
-          bookingId,
-          action: action.toUpperCase(),
-          status: action === 'cancel' ? 'cancelled' : 'confirmed',
-          name,
-          phone,
-          service: service || 'Usługa podstawowa',
-          datetime: datetime || createdAt,
-          new_datetime: new_datetime || null,
-          language: language || 'pl',
-          notes: notes || '',
-          createdAt
-        }, { merge: true });
-        results.firestore = true;
-      } catch (dbErr) {
-        console.error('Firestore Admin Error:', dbErr);
+      } catch (fsErr) {
+        console.error('Firestore REST API Error:', fsErr);
       }
     }
 
-    // 2. Telegram Notification
+    // 2. Send Telegram Notification
     if (botToken && chatId) {
-      const formattedDate = datetime ? new Date(datetime).toLocaleString('pl-PL') : 'Nieokreślony czas';
       const actionTitle = action === 'cancel' ? '❌ ОТМЕНА ЗАПИСИ' : action === 'reschedule' ? '🔄 ПЕРЕНОС ЗАПИСИ' : '📅 НОВАЯ ЗАПИСЬ';
       const tgMessage = `${actionTitle} HALO AI! (${bookingId})\n\n👤 *Клиент:* ${name}\n📞 *Телефон:* ${phone}\n✂️ *Услуга:* ${service || 'Стандартная запись'}\n⏰ *Время:* ${formattedDate}\n🌐 *Язык:* ${language || 'pl'}`;
 
@@ -85,12 +76,13 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      booking: { id: bookingId, action, name, phone, service, datetime },
+      action,
+      booking: { id: bookingId, name, phone, service: service || 'Usługa podstawowa', datetime: formattedDate },
       integrations: results
     });
 
   } catch (err) {
     console.error('Server error in booking endpoint:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error', message: err.message });
   }
 }
