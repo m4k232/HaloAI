@@ -4,27 +4,32 @@ import admin from 'firebase-admin';
 function getDb() {
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
   if (!projectId || !privateKey) {
     return null;
   }
 
-  if (!admin.apps.length) {
-    try {
+  try {
+    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+      privateKey = privateKey.slice(1, -1);
+    }
+    privateKey = privateKey.replace(/\\n/g, '\n');
+
+    if (!admin.apps.length) {
       admin.initializeApp({
         credential: admin.credential.cert({
           projectId,
           clientEmail,
-          privateKey: privateKey.replace(/\\n/g, '\n')
+          privateKey
         })
       });
-    } catch (err) {
-      console.error('Firebase Admin Init Error:', err);
-      return null;
     }
+    return admin.firestore();
+  } catch (err) {
+    console.error('Firebase Admin Init Error:', err);
+    return null;
   }
-  return admin.firestore();
 }
 
 export default async function handler(req, res) {
