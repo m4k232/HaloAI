@@ -26,6 +26,13 @@ export default async function handler(req, res) {
       }
     }
 
+    // Clean phone number formatting (extract digits if available)
+    let formattedPhone = String(phone);
+    const digitsOnly = formattedPhone.replace(/\D/g, '');
+    if (digitsOnly.length >= 7) {
+      formattedPhone = (formattedPhone.includes('+') ? '+' : '') + digitsOnly;
+    }
+
     const results = {
       telegram: false,
       firestore: false
@@ -45,7 +52,7 @@ export default async function handler(req, res) {
             action: { stringValue: action.toUpperCase() },
             status: { stringValue: action === 'cancel' ? 'cancelled' : 'confirmed' },
             name: { stringValue: String(name) },
-            phone: { stringValue: String(phone) },
+            phone: { stringValue: formattedPhone },
             service: { stringValue: String(service || 'Usługa podstawowa') },
             datetime: { stringValue: String(formattedDate) },
             language: { stringValue: String(language || 'pl') },
@@ -72,7 +79,7 @@ export default async function handler(req, res) {
     // 2. Send Telegram Notification
     if (botToken && chatId) {
       const actionTitle = action === 'cancel' ? '❌ ОТМЕНА ЗАПИСИ' : action === 'reschedule' ? '🔄 ПЕРЕНОС ЗАПИСИ' : '📅 НОВАЯ ЗАПИСЬ';
-      const tgMessage = `${actionTitle} HALO AI! (${bookingId})\n\n👤 *Клиент:* ${name}\n📞 *Телефон:* ${phone}\n✂️ *Услуга:* ${service || 'Стандартная запись'}\n⏰ *Время:* ${formattedDate}\n🌐 *Язык:* ${language || 'pl'}`;
+      const tgMessage = `${actionTitle} HALO AI! (${bookingId})\n\n👤 *Клиент:* ${name}\n📞 *Телефон:* ${formattedPhone}\n✂️ *Услуга:* ${service || 'Стандартная запись'}\n⏰ *Время:* ${formattedDate}\n🌐 *Язык:* ${language || 'pl'}`;
 
       try {
         const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
@@ -89,7 +96,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       action,
-      booking: { id: bookingId, name, phone, service: service || 'Usługa podstawowa', datetime: formattedDate },
+      booking: { id: bookingId, name, phone: formattedPhone, service: service || 'Usługa podstawowa', datetime: formattedDate },
       integrations: results
     });
 
