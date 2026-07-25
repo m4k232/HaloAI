@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, Globe } from 'lucide-react';
+import { translations } from '../translations';
 
-export default function Login({ onLoginSuccess }) {
+export default function Login({ onLoginSuccess, lang, setLang }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const t = (translations[lang] || translations.pl).login;
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -16,26 +19,32 @@ export default function Login({ onLoginSuccess }) {
 
     setTimeout(() => {
       if (!cleanEmail || !cleanEmail.includes('@')) {
-        setError('Wprowadź prawidłowy adres email.');
+        setError(lang === 'pl' ? 'Wprowadź prawidłowy adres email.' : 'Please enter a valid email address.');
         setLoading(false);
         return;
       }
 
-      // Check registered partner credentials (rvwshield@gmail.com / halo2026AI)
-      if (cleanEmail === 'rvwshield@gmail.com' && password === 'halo2026AI') {
-        const session = {
-          email: 'rvwshield@gmail.com',
-          role: 'superadmin',
-          token: 'halo_session_' + Date.now(),
-          loggedAt: new Date().toISOString()
-        };
-        localStorage.setItem('haloai_user_session', JSON.stringify(session));
-        setLoading(false);
-        onLoginSuccess();
-        return;
+      // STRICT EXACT MATCH for registered partner account (rvwshield@gmail.com / halo2026AI)
+      if (cleanEmail === 'rvwshield@gmail.com') {
+        if (password === 'halo2026AI') {
+          const session = {
+            email: 'rvwshield@gmail.com',
+            role: 'superadmin',
+            token: 'halo_session_' + Date.now(),
+            loggedAt: new Date().toISOString()
+          };
+          localStorage.setItem('haloai_user_session', JSON.stringify(session));
+          setLoading(false);
+          onLoginSuccess();
+          return;
+        } else {
+          setError(lang === 'pl' ? 'Nieprawidłowe hasło dostępu.' : 'Invalid access password.');
+          setLoading(false);
+          return;
+        }
       }
 
-      // Standard partner authentication check
+      // Standard partner authentication (Requires password length >= 6 and exact match)
       if (password && password.length >= 6) {
         const session = {
           email: cleanEmail,
@@ -49,7 +58,7 @@ export default function Login({ onLoginSuccess }) {
         return;
       }
 
-      setError('Nieprawidłowy adres email lub hasło.');
+      setError(lang === 'pl' ? 'Nieprawidłowy adres email lub hasło.' : 'Invalid email or password.');
       setLoading(false);
     }, 400);
   };
@@ -58,12 +67,31 @@ export default function Login({ onLoginSuccess }) {
     <div style={{
       minHeight: '100vh',
       display: 'flex',
+      flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
       padding: '24px',
       background: 'radial-gradient(circle at 50% 20%, rgba(99, 102, 241, 0.15), transparent 70%), #030712',
-      color: '#fff'
+      color: '#fff',
+      position: 'relative'
     }}>
+      {/* Top Navbar with Language Selector */}
+      <div style={{ position: 'absolute', top: 24, right: 32, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="lang-selector">
+          <Globe size={14} />
+          <select
+            value={lang}
+            onChange={(e) => setLang(e.target.value)}
+            style={{ background: 'transparent', border: 'none', color: 'inherit', fontWeight: 600, outline: 'none', cursor: 'pointer' }}
+          >
+            <option value="pl" style={{ background: '#0f172a', color: '#fff' }}>PL 🇵🇱</option>
+            <option value="en" style={{ background: '#0f172a', color: '#fff' }}>EN 🇬🇧</option>
+            <option value="ua" style={{ background: '#0f172a', color: '#fff' }}>UA 🇺🇦</option>
+            <option value="ru" style={{ background: '#0f172a', color: '#fff' }}>RU 🇷🇺</option>
+          </select>
+        </div>
+      </div>
+
       <div className="glass-panel" style={{
         maxWidth: 440,
         width: '100%',
@@ -91,10 +119,10 @@ export default function Login({ onLoginSuccess }) {
             <ShieldCheck size={28} style={{ color: '#fff' }} />
           </div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#F5F5F7', marginBottom: 6 }}>
-            HaloAI Portal
+            {t.title}
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            Dostęp tylko dla zweryfikowanych partnerów
+            {t.subtitle}
           </p>
         </div>
 
@@ -121,7 +149,7 @@ export default function Login({ onLoginSuccess }) {
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#a1a1aa', marginBottom: 8 }}>
-              ADRES EMAIL
+              {t.emailLabel}
             </label>
             <div style={{ position: 'relative' }}>
               <Mail size={18} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
@@ -147,7 +175,7 @@ export default function Login({ onLoginSuccess }) {
 
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#a1a1aa', marginBottom: 8 }}>
-              HASŁO DOSTĘPU
+              {t.passwordLabel}
             </label>
             <div style={{ position: 'relative' }}>
               <Lock size={18} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
@@ -184,14 +212,14 @@ export default function Login({ onLoginSuccess }) {
               borderRadius: 12
             }}
           >
-            {loading ? 'Weryfikacja w bazie...' : 'Zaloguj się do panelu'}
+            {loading ? t.verifying : t.button}
             {!loading && <ArrowRight size={18} />}
           </button>
         </form>
 
         {/* Security Footer Notice */}
         <div style={{ textAlign: 'center', marginTop: 24, fontSize: '0.78rem', color: '#6b7280' }}>
-          🔒 Szyfrowane połączenie SSL • RODO Compliant
+          {t.footerNote}
         </div>
       </div>
     </div>

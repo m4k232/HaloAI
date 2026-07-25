@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import {
   Activity, Users, CheckCircle, XCircle, Clock, Search, LogOut, RefreshCw,
-  Building2, Phone, Calendar, ArrowUpRight, ShieldCheck, Filter
+  Building2, Phone, Calendar, ArrowUpRight, ShieldCheck, Filter, Globe
 } from 'lucide-react';
 import { fetchBookingsFromFirestore } from '../firebase';
+import { translations } from '../translations';
 
-export default function Dashboard({ userSession, onLogout }) {
+export default function Dashboard({ userSession, onLogout, lang, setLang }) {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [activeBusiness, setActiveBusiness] = useState('BarberShop Gentleman');
+
+  const t = (translations[lang] || translations.pl).dashboard;
 
   const loadData = async () => {
     setLoading(true);
@@ -21,7 +24,6 @@ export default function Dashboard({ userSession, onLogout }) {
 
   useEffect(() => {
     loadData();
-    // Auto-refresh every 10 seconds
     const interval = setInterval(loadData, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -87,14 +89,29 @@ export default function Dashboard({ userSession, onLogout }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>{userSession?.email || 'admin@haloai.pl'}</span>
+          {/* Language Selector */}
+          <div className="lang-selector">
+            <Globe size={14} />
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value)}
+              style={{ background: 'transparent', border: 'none', color: 'inherit', fontWeight: 600, outline: 'none', cursor: 'pointer' }}
+            >
+              <option value="pl" style={{ background: '#0f172a', color: '#fff' }}>PL 🇵🇱</option>
+              <option value="en" style={{ background: '#0f172a', color: '#fff' }}>EN 🇬🇧</option>
+              <option value="ua" style={{ background: '#0f172a', color: '#fff' }}>UA 🇺🇦</option>
+              <option value="ru" style={{ background: '#0f172a', color: '#fff' }}>RU 🇷🇺</option>
+            </select>
+          </div>
+
+          <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>{userSession?.email || 'rvwshield@gmail.com'}</span>
           <button
             onClick={onLogout}
             className="btn-secondary"
             style={{ padding: '8px 16px', fontSize: '0.85rem', gap: 8, borderRadius: 10 }}
           >
             <LogOut size={16} />
-            Wyloguj się
+            {t.logout}
           </button>
         </div>
       </nav>
@@ -104,10 +121,10 @@ export default function Dashboard({ userSession, onLogout }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 28 }}>
           <div>
             <h1 style={{ fontSize: '2rem', fontWeight: 700, color: '#fff', marginBottom: 4 }}>
-              Panel Menedżerski
+              {t.title}
             </h1>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              Analityka połączeń i rezerwacji w czasie rzeczywistym
+              {t.subtitle}
             </p>
           </div>
 
@@ -117,7 +134,7 @@ export default function Dashboard({ userSession, onLogout }) {
             style={{ padding: '10px 18px', fontSize: '0.85rem', gap: 8, borderRadius: 10 }}
           >
             <RefreshCw size={15} className={loading ? 'spin' : ''} />
-            Odśwież dane
+            {t.refresh}
           </button>
         </div>
 
@@ -131,41 +148,41 @@ export default function Dashboard({ userSession, onLogout }) {
           {/* Total Calls */}
           <div className="glass-panel" style={{ padding: '24px 20px', borderRadius: 18, border: '1px solid rgba(255,255,255,0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span style={{ color: '#9ca3af', fontSize: '0.85rem', fontWeight: 600 }}>WSZYSTKIE POŁĄCZENIA</span>
+              <span style={{ color: '#9ca3af', fontSize: '0.85rem', fontWeight: 600 }}>{t.totalCalls}</span>
               <Activity size={20} style={{ color: '#818cf8' }} />
             </div>
             <div style={{ fontSize: '2.2rem', fontWeight: 800, color: '#fff' }}>{totalCalls}</div>
-            <div style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: 4 }}>Przyjęte przez AI 24/7</div>
+            <div style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: 4 }}>{t.totalCallsNote}</div>
           </div>
 
           {/* Confirmed */}
           <div className="glass-panel" style={{ padding: '24px 20px', borderRadius: 18, border: '1px solid rgba(16, 185, 129, 0.2)', background: 'rgba(16, 185, 129, 0.03)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span style={{ color: '#34d399', fontSize: '0.85rem', fontWeight: 600 }}>POTWIERDZONE WIZYTY</span>
+              <span style={{ color: '#34d399', fontSize: '0.85rem', fontWeight: 600 }}>{t.confirmedVisits}</span>
               <CheckCircle size={20} style={{ color: '#34d399' }} />
             </div>
             <div style={{ fontSize: '2.2rem', fontWeight: 800, color: '#34d399' }}>{confirmedCount}</div>
-            <div style={{ fontSize: '0.78rem', color: '#059669', marginTop: 4 }}>Zapisane w Firestore & TG</div>
+            <div style={{ fontSize: '0.78rem', color: '#059669', marginTop: 4 }}>{t.confirmedNote}</div>
           </div>
 
           {/* Cancelled */}
           <div className="glass-panel" style={{ padding: '24px 20px', borderRadius: 18, border: '1px solid rgba(244, 63, 94, 0.2)', background: 'rgba(244, 63, 94, 0.03)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span style={{ color: '#fb7185', fontSize: '0.85rem', fontWeight: 600 }}>ODWOŁANE WIZYTY</span>
+              <span style={{ color: '#fb7185', fontSize: '0.85rem', fontWeight: 600 }}>{t.cancelledVisits}</span>
               <XCircle size={20} style={{ color: '#fb7185' }} />
             </div>
             <div style={{ fontSize: '2.2rem', fontWeight: 800, color: '#fb7185' }}>{cancelledCount}</div>
-            <div style={{ fontSize: '0.78rem', color: '#e11d48', marginTop: 4 }}>Odwołania telefoniczne</div>
+            <div style={{ fontSize: '0.78rem', color: '#e11d48', marginTop: 4 }}>{t.cancelledNote}</div>
           </div>
 
           {/* Saved Hours */}
           <div className="glass-panel" style={{ padding: '24px 20px', borderRadius: 18, border: '1px solid rgba(255,255,255,0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span style={{ color: '#9ca3af', fontSize: '0.85rem', fontWeight: 600 }}>ZAOSZCZĘDZONY CZAS</span>
+              <span style={{ color: '#9ca3af', fontSize: '0.85rem', fontWeight: 600 }}>{t.savedTime}</span>
               <Clock size={20} style={{ color: '#fbbf24' }} />
             </div>
-            <div style={{ fontSize: '2.2rem', fontWeight: 800, color: '#fff' }}>{savedHours} <span style={{ fontSize: '1.1rem', fontWeight: 500 }}>godz.</span></div>
-            <div style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: 4 }}>Czas pracy recepcji</div>
+            <div style={{ fontSize: '2.2rem', fontWeight: 800, color: '#fff' }}>{savedHours} <span style={{ fontSize: '1.1rem', fontWeight: 500 }}>{t.hoursUnit}</span></div>
+            <div style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: 4 }}>{t.savedTimeNote}</div>
           </div>
         </div>
 
@@ -188,7 +205,7 @@ export default function Dashboard({ userSession, onLogout }) {
                 color: statusFilter === 'ALL' ? '#000000' : '#9ca3af'
               }}
             >
-              Wszystkie ({bookings.length})
+              {t.filterAll} ({bookings.length})
             </button>
             <button
               onClick={() => setStatusFilter('CONFIRMED')}
@@ -198,7 +215,7 @@ export default function Dashboard({ userSession, onLogout }) {
                 color: statusFilter === 'CONFIRMED' ? '#ffffff' : '#9ca3af'
               }}
             >
-              Potwierdzone ({confirmedCount})
+              {t.filterConfirmed} ({confirmedCount})
             </button>
             <button
               onClick={() => setStatusFilter('CANCELLED')}
@@ -208,7 +225,7 @@ export default function Dashboard({ userSession, onLogout }) {
                 color: statusFilter === 'CANCELLED' ? '#ffffff' : '#9ca3af'
               }}
             >
-              Odwołane ({cancelledCount})
+              {t.filterCancelled} ({cancelledCount})
             </button>
           </div>
 
@@ -217,7 +234,7 @@ export default function Dashboard({ userSession, onLogout }) {
             <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
             <input
               type="text"
-              placeholder="Szukaj klienta, telefonu lub usługi..."
+              placeholder={t.searchPlaceholder}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{
@@ -240,12 +257,12 @@ export default function Dashboard({ userSession, onLogout }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#9ca3af' }}>
-                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>ID ZGŁOSZENIA</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>KLIENT</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>TELEFON</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>USŁUGA</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>TERMIN WIZYTY</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>STATUS</th>
+                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>{t.colId}</th>
+                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>{t.colClient}</th>
+                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>{t.colPhone}</th>
+                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>{t.colService}</th>
+                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>{t.colDatetime}</th>
+                  <th style={{ padding: '16px 20px', fontWeight: 600 }}>{t.colStatus}</th>
                 </tr>
               </thead>
               <tbody>
@@ -253,7 +270,7 @@ export default function Dashboard({ userSession, onLogout }) {
                   <tr>
                     <td colSpan="6" style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
                       <RefreshCw size={24} className="spin" style={{ margin: '0 auto 12px auto' }} />
-                      Ładowanie rezerwacji z bazy danych...
+                      Ładowanie rezerwacji...
                     </td>
                   </tr>
                 ) : filteredBookings.length === 0 ? (
@@ -295,7 +312,7 @@ export default function Dashboard({ userSession, onLogout }) {
                               padding: '4px 10px', borderRadius: 20, fontSize: '0.78rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6
                             }}>
                               <XCircle size={13} />
-                              ODWOŁANO
+                              {t.badgeCancelled}
                             </span>
                           ) : (
                             <span style={{
@@ -303,7 +320,7 @@ export default function Dashboard({ userSession, onLogout }) {
                               padding: '4px 10px', borderRadius: 20, fontSize: '0.78rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6
                             }}>
                               <CheckCircle size={13} />
-                              POTWIERDZONO
+                              {t.badgeConfirmed}
                             </span>
                           )}
                         </td>

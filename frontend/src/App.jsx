@@ -63,15 +63,15 @@ export default function App() {
 
   // ROUTE 1: Login Page
   if (currentPath === '/login') {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
+    return <Login onLoginSuccess={handleLoginSuccess} lang={lang} setLang={setLang} />;
   }
 
   // ROUTE 2: Protected Dashboard Page
   if (currentPath === '/dashboard') {
     if (!userSession) {
-      return <Login onLoginSuccess={handleLoginSuccess} />;
+      return <Login onLoginSuccess={handleLoginSuccess} lang={lang} setLang={setLang} />;
     }
-    return <Dashboard userSession={userSession} onLogout={handleLogout} />;
+    return <Dashboard userSession={userSession} onLogout={handleLogout} lang={lang} setLang={setLang} />;
   }
 
   const t = translations[lang] || translations.pl;
