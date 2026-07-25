@@ -142,7 +142,7 @@ export default function Login({ onLoginSuccess, lang, setLang }) {
               <input
                 type="email"
                 required
-                placeholder="rvwshield@gmail.com"
+                placeholder="name@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 style={{
