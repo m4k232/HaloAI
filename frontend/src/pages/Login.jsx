@@ -17,50 +17,36 @@ export default function Login({ onLoginSuccess, lang, setLang }) {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    setTimeout(() => {
+    try {
       if (!cleanEmail || !cleanEmail.includes('@')) {
-        setError(lang === 'pl' ? 'Wprowadź prawidłowy adres email.' : 'Please enter a valid email address.');
-        setLoading(false);
-        return;
+        throw new Error(lang === 'pl' ? 'Wprowadź prawidłowy adres email.' : 'Please enter a valid email address.');
       }
 
-      // STRICT EXACT MATCH for registered partner account (rvwshield@gmail.com / halo2026AI)
-      if (cleanEmail === 'rvwshield@gmail.com') {
-        if (password === 'halo2026AI') {
-          const session = {
-            email: 'rvwshield@gmail.com',
-            role: 'superadmin',
-            token: 'halo_session_' + Date.now(),
-            loggedAt: new Date().toISOString()
-          };
-          localStorage.setItem('haloai_user_session', JSON.stringify(session));
-          setLoading(false);
-          onLoginSuccess();
-          return;
-        } else {
-          setError(lang === 'pl' ? 'Nieprawidłowe hasło dostępu.' : 'Invalid access password.');
-          setLoading(false);
-          return;
-        }
+      if (!password) {
+        throw new Error(lang === 'pl' ? 'Wprowadź hasło dostępu.' : 'Please enter your password.');
       }
 
-      // Standard partner authentication (Requires password length >= 6 and exact match)
-      if (password && password.length >= 6) {
-        const session = {
-          email: cleanEmail,
-          role: 'partner',
-          token: 'halo_session_' + Date.now(),
-          loggedAt: new Date().toISOString()
-        };
-        localStorage.setItem('haloai_user_session', JSON.stringify(session));
+      // Send authentication request to Vercel Serverless API
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        localStorage.setItem('haloai_user_session', JSON.stringify(data.session));
         setLoading(false);
         onLoginSuccess();
-        return;
+      } else {
+        throw new Error(data.message || (lang === 'pl' ? 'Nieprawidłowy email lub hasło.' : 'Invalid email or password.'));
       }
-
-      setError(lang === 'pl' ? 'Nieprawidłowy adres email lub hasło.' : 'Invalid email or password.');
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(err.message || (lang === 'pl' ? 'Wystąpił błąd podczas logowania.' : 'An error occurred during login.'));
       setLoading(false);
-    }, 400);
+    }
   };
 
   return (
