@@ -3,10 +3,35 @@ import { translations } from './translations';
 import CallSimulator from './components/CallSimulator';
 import RoiCalculator from './components/RoiCalculator';
 import LeadForm from './components/LeadForm';
-import { Activity, Sparkles, Check, ArrowRight, ShieldCheck, Zap, Globe } from 'lucide-react';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import { Activity, Sparkles, Check, ArrowRight, ShieldCheck, Zap, Globe, Lock } from 'lucide-react';
 
 export default function App() {
   const [lang, setLang] = useState('pl');
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [userSession, setUserSession] = useState(null);
+
+  // Read session on load
+  useEffect(() => {
+    const saved = localStorage.getItem('haloai_user_session');
+    if (saved) {
+      try {
+        setUserSession(JSON.parse(saved));
+      } catch (e) {}
+    }
+
+    const handlePopState = () => setCurrentPath(window.location.pathname);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Navigation Helper
+  const navigateTo = (path) => {
+    window.history.pushState({}, '', path);
+    setCurrentPath(path);
+    window.scrollTo(0, 0);
+  };
 
   // Auto-detect browser language on load
   useEffect(() => {
@@ -22,13 +47,41 @@ export default function App() {
     }
   }, []);
 
+  const handleLoginSuccess = () => {
+    const saved = localStorage.getItem('haloai_user_session');
+    if (saved) {
+      setUserSession(JSON.parse(saved));
+    }
+    navigateTo('/dashboard');
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('haloai_user_session');
+    setUserSession(null);
+    navigateTo('/login');
+  };
+
+  // ROUTE 1: Login Page
+  if (currentPath === '/login') {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // ROUTE 2: Protected Dashboard Page
+  if (currentPath === '/dashboard') {
+    if (!userSession) {
+      return <Login onLoginSuccess={handleLoginSuccess} />;
+    }
+    return <Dashboard userSession={userSession} onLogout={handleLogout} />;
+  }
+
   const t = translations[lang] || translations.pl;
 
+  // ROUTE 3: Main Landing Page
   return (
     <div className="app-container">
       {/* Solid Blur Navbar */}
       <nav className="navbar">
-        <a href="#" className="brand-logo" style={{ gap: '12px' }}>
+        <a href="/" onClick={(e) => { e.preventDefault(); navigateTo('/'); }} className="brand-logo" style={{ gap: '12px' }}>
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.4))' }}>
             <circle cx="12" cy="12" r="9" stroke="#ffffff" strokeWidth="2" strokeOpacity="0.9" />
             <circle cx="12" cy="12" r="5" stroke="#a1a1aa" strokeWidth="2" strokeOpacity="0.7" />
@@ -56,6 +109,15 @@ export default function App() {
               <option value="ru" style={{ background: '#0f172a', color: '#fff' }}>RU 🇷🇺</option>
             </select>
           </div>
+
+          <button
+            onClick={() => navigateTo(userSession ? '/dashboard' : '/login')}
+            className="btn-secondary"
+            style={{ padding: '8px 14px', fontSize: '0.82rem', gap: 6, borderRadius: 10 }}
+          >
+            <Lock size={13} />
+            {userSession ? 'Panel' : 'Portal Partnera'}
+          </button>
 
           <a href="#contact-form" className="btn-primary" style={{ padding: '8px 18px', fontSize: '0.85rem' }}>
             {t.nav.cta}
@@ -213,9 +275,18 @@ export default function App() {
 
       {/* Footer */}
       <footer>
-        <div className="container">
-          <p style={{ marginBottom: 8 }}>{t.footer.rights}</p>
-          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{t.footer.rodo}</p>
+        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+          <div>
+            <p style={{ marginBottom: 4 }}>{t.footer.rights}</p>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{t.footer.rodo}</p>
+          </div>
+
+          <button
+            onClick={() => navigateTo(userSession ? '/dashboard' : '/login')}
+            style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}
+          >
+            Portal Partnerów (Login)
+          </button>
         </div>
       </footer>
     </div>
