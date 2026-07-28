@@ -4,16 +4,48 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { action = 'create', name, phone, service, datetime, new_datetime, language, notes } = req.body || {};
-
-    if (!name || !phone) {
-      return res.status(400).json({ error: 'Missing required fields: name, phone' });
+    const body = req.body || {};
+    
+    // Extract Vapi payload arguments (handles direct JSON body or Vapi toolCall structure)
+    let toolArgs = body;
+    if (body.message?.toolCalls?.[0]?.function?.arguments) {
+      try {
+        toolArgs = typeof body.message.toolCalls[0].function.arguments === 'string'
+          ? JSON.parse(body.message.toolCalls[0].function.arguments)
+          : body.message.toolCalls[0].function.arguments;
+      } catch (e) {}
     }
 
-    const bookingId = 'HALO-' + Math.floor(100000 + Math.random() * 900000);
-    const createdAt = new Date().toISOString();
+    const action = toolArgs.action || body.action || 'create';
+    const name = toolArgs.name || body.name || 'Klient AI';
+    let phone = toolArgs.phone || body.phone || '';
+    const service = toolArgs.service || body.service || 'Usługa podstawowa';
+    const datetime = toolArgs.datetime || body.datetime || '';
+    const language = toolArgs.language || body.language || 'pl';
 
-    // Safely format datetime (handles ISO dates, raw text like "понедельник 15:00", etc.)
+    // 1. SMART PHONE NUMBER FALLBACK
+    // If phone contains string variable 'customer.number' or is empty, extract real incoming caller ID
+    const callerId = body.call?.customer?.number || 
+                     body.message?.call?.customer?.number || 
+                     body.customerNumber || 
+                     '';
+
+    if (!phone || String(phone).includes('customer.number') || String(phone).includes('call.customer')) {
+      if (callerId) {
+        phone = callerId;
+      } else {
+        phone = '+48 600 000 000'; // Default fallback
+      }
+    }
+
+    // Clean phone format
+    let formattedPhone = String(phone).trim();
+    const digitsOnly = formattedPhone.replace(/\D/g, '');
+    if (digitsOnly.length >= 7) {
+      formattedPhone = (formattedPhone.startsWith('+') ? '+' : '') + digitsOnly;
+    }
+
+    // 2. SMART DATETIME FORMATTING
     let formattedDate = 'Nieokreślony czas';
     if (datetime) {
       const parsedDate = new Date(datetime);
@@ -22,27 +54,27 @@ export default async function handler(req, res) {
           weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
         });
       } else {
-        formattedDate = String(datetime);
+        // Keep clean text (capitalizing first letter)
+        const strDate = String(datetime).trim();
+        formattedDate = strDate.charAt(0).toUpperCase() + strDate.slice(1);
       }
     }
 
-    // Clean phone number formatting (extract digits if available)
-    let formattedPhone = String(phone);
-    const digitsOnly = formattedPhone.replace(/\D/g, '');
-    if (digitsOnly.length >= 7) {
-      formattedPhone = (formattedPhone.includes('+') ? '+' : '') + digitsOnly;
-    }
+    const bookingId = 'HALO-' + Math.floor(100000 + Math.random() * 900000);
+    const createdAt = new Date().toISOString();
 
     const results = {
       telegram: false,
-      firestore: false
+      firestore: false,
+      googleSheet: false
     };
 
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
     const projectId = process.env.FIREBASE_PROJECT_ID;
+    const googleSheetWebhook = process.env.GOOGLE_SHEETS_WEBHOOK_URL;
 
-    // 1. Save to Firestore via REST API (Zero-dependency, 100% reliable on Vercel)
+    // 1. Save to Firestore via REST API (Zero-dependency)
     if (projectId) {
       try {
         const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/bookings?documentId=${bookingId}`;
@@ -53,9 +85,9 @@ export default async function handler(req, res) {
             status: { stringValue: action === 'cancel' ? 'cancelled' : 'confirmed' },
             name: { stringValue: String(name) },
             phone: { stringValue: formattedPhone },
-            service: { stringValue: String(service || 'Usługa podstawowa') },
+            service: { stringValue: String(service) },
             datetime: { stringValue: String(formattedDate) },
-            language: { stringValue: String(language || 'pl') },
+            language: { stringValue: String(language) },
             createdAt: { stringValue: createdAt }
           }
         };
@@ -66,20 +98,38 @@ export default async function handler(req, res) {
           body: JSON.stringify(firestoreDoc)
         });
 
-        if (fsRes.ok) {
-          results.firestore = true;
-        } else {
-          console.error('Firestore REST API response:', await fsRes.text());
-        }
+        if (fsRes.ok) results.firestore = true;
       } catch (fsErr) {
         console.error('Firestore REST API Error:', fsErr);
       }
     }
 
-    // 2. Send Telegram Notification
+    // 2. Optional Sync to Google Sheets (if Webhook URL configured)
+    if (googleSheetWebhook) {
+      try {
+        const sheetRes = await fetch(googleSheetWebhook, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bookingId,
+            action: action.toUpperCase(),
+            name,
+            phone: formattedPhone,
+            service,
+            datetime: formattedDate,
+            createdAt
+          })
+        });
+        if (sheetRes.ok) results.googleSheet = true;
+      } catch (sheetErr) {
+        console.error('Google Sheet Webhook Error:', sheetErr);
+      }
+    }
+
+    // 3. Send Instant Telegram Notification
     if (botToken && chatId) {
       const actionTitle = action === 'cancel' ? '❌ ОТМЕНА ЗАПИСИ' : action === 'reschedule' ? '🔄 ПЕРЕНОС ЗАПИСИ' : '📅 НОВАЯ ЗАПИСЬ';
-      const tgMessage = `${actionTitle} HALO AI! (${bookingId})\n\n👤 *Клиент:* ${name}\n📞 *Телефон:* ${formattedPhone}\n✂️ *Услуга:* ${service || 'Стандартная запись'}\n⏰ *Время:* ${formattedDate}\n🌐 *Язык:* ${language || 'pl'}`;
+      const tgMessage = `${actionTitle} HALO AI! (${bookingId})\n\n👤 *Клиент:* ${name}\n📞 *Телефон:* ${formattedPhone}\n✂️ *Услуга:* ${service}\n⏰ *Время:* ${formattedDate}\n🌐 *Язык:* ${language}`;
 
       try {
         const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
@@ -93,10 +143,11 @@ export default async function handler(req, res) {
       }
     }
 
+    // Response back to Vapi or Client
     return res.status(200).json({
       success: true,
       action,
-      booking: { id: bookingId, name, phone: formattedPhone, service: service || 'Usługa podstawowa', datetime: formattedDate },
+      booking: { id: bookingId, name, phone: formattedPhone, service, datetime: formattedDate },
       integrations: results
     });
 
