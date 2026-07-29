@@ -1,7 +1,7 @@
 // Serverless endpoint to manage B2B clients and fetch business config
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -29,6 +29,8 @@ export default async function handler(req, res) {
           businessName: fields.businessName?.stringValue || 'Brak nazwy',
           assignedPhone: fields.assignedPhone?.stringValue || '',
           ownerEmail: fields.ownerEmail?.stringValue || '',
+          address: fields.address?.stringValue || '',
+          workingHours: fields.workingHours?.stringValue || '',
           googleCalendarId: fields.googleCalendarId?.stringValue || '',
           googleSheetId: fields.googleSheetId?.stringValue || '',
           telegramChatId: fields.telegramChatId?.stringValue || '',
@@ -44,22 +46,25 @@ export default async function handler(req, res) {
     }
   }
 
-  // POST: Add or update a B2B client
-  if (req.method === 'POST') {
+  // POST / PATCH: Add or update a B2B client
+  if (req.method === 'POST' || req.method === 'PATCH') {
     try {
       const {
         clientId,
         businessName,
         assignedPhone,
         ownerEmail,
+        address,
+        workingHours,
         googleCalendarId,
         googleSheetId,
         telegramChatId,
         priceList
       } = req.body || {};
 
-      const id = clientId || 'client_' + Date.now();
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/clients?documentId=${id}`;
+      const id = clientId || 'barbershop_gentleman';
+      // Using PATCH on the document URL updates existing fields or creates if missing
+      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/clients/${id}?updateMask.fieldPaths=businessName&updateMask.fieldPaths=assignedPhone&updateMask.fieldPaths=ownerEmail&updateMask.fieldPaths=address&updateMask.fieldPaths=workingHours&updateMask.fieldPaths=googleCalendarId&updateMask.fieldPaths=googleSheetId&updateMask.fieldPaths=telegramChatId&updateMask.fieldPaths=priceList&updateMask.fieldPaths=createdAt`;
 
       const firestoreDoc = {
         fields: {
@@ -67,16 +72,18 @@ export default async function handler(req, res) {
           businessName: { stringValue: String(businessName || 'BarberShop Gentleman') },
           assignedPhone: { stringValue: String(assignedPhone || '+19382539583') },
           ownerEmail: { stringValue: String(ownerEmail || 'rvwshield@gmail.com') },
+          address: { stringValue: String(address || 'ul. Marszałkowska 10, Warszawa') },
+          workingHours: { stringValue: String(workingHours || 'Poniedziałek - Piątek: 09:00 - 20:00') },
           googleCalendarId: { stringValue: String(googleCalendarId || '') },
           googleSheetId: { stringValue: String(googleSheetId || '') },
           telegramChatId: { stringValue: String(telegramChatId || '') },
-          priceList: { stringValue: String(priceList || '') },
+          priceList: { stringValue: String(priceList || 'Strzyżenie: 70 PLN, Broda: 50 PLN, Combo: 110 PLN') },
           createdAt: { stringValue: new Date().toISOString() }
         }
       };
 
       const fsRes = await fetch(firestoreUrl, {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(firestoreDoc)
       });
@@ -89,8 +96,8 @@ export default async function handler(req, res) {
 
       return res.status(200).json({
         success: true,
-        message: 'Client added successfully',
-        client: { id, businessName, assignedPhone, ownerEmail }
+        message: 'Client updated successfully in Firestore',
+        client: { id, businessName, assignedPhone, address, workingHours, priceList }
       });
     } catch (err) {
       console.error('Error saving client:', err);
