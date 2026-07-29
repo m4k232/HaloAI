@@ -46,7 +46,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // POST / PATCH: Add or update a B2B client using Firestore commit REST API
+  // POST / PATCH: Add or update a B2B client using Firestore commit REST API (overwriting existing fields)
   if (req.method === 'POST' || req.method === 'PATCH') {
     try {
       const {
@@ -66,12 +66,12 @@ export default async function handler(req, res) {
       const commitUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:commit`;
 
       const docName = `projects/${projectId}/databases/(default)/documents/clients/${id}`;
-      const fieldPaths = ['clientId', 'businessName', 'assignedPhone', 'ownerEmail', 'address', 'workingHours', 'googleCalendarId', 'googleSheetId', 'telegramChatId', 'priceList', 'createdAt'];
 
+      // First delete existing doc if present, then insert updated doc
       const commitBody = {
         writes: [
+          { delete: docName },
           {
-            updateMask: { fieldPaths },
             update: {
               name: docName,
               fields: {
