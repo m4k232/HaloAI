@@ -46,7 +46,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // POST / PATCH: Add or update a B2B client
+  // POST / PATCH: Add or update a B2B client using Firestore commit REST API
   if (req.method === 'POST' || req.method === 'PATCH') {
     try {
       const {
@@ -63,29 +63,36 @@ export default async function handler(req, res) {
       } = req.body || {};
 
       const id = clientId || 'barbershop_gentleman';
-      // In Firestore REST API, using PATCH to /documents/clients/{id} creates or replaces document
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/clients/${id}`;
+      const commitUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:commit`;
 
-      const firestoreDoc = {
-        fields: {
-          clientId: { stringValue: id },
-          businessName: { stringValue: String(businessName || 'BarberShop Gentleman') },
-          assignedPhone: { stringValue: String(assignedPhone || '+19382539583') },
-          ownerEmail: { stringValue: String(ownerEmail || 'rvwshield@gmail.com') },
-          address: { stringValue: String(address || 'ul. Marszałkowska 10, Warszawa') },
-          workingHours: { stringValue: String(workingHours || 'Poniedziałek - Piątek: 09:00 - 20:00') },
-          googleCalendarId: { stringValue: String(googleCalendarId || '') },
-          googleSheetId: { stringValue: String(googleSheetId || '') },
-          telegramChatId: { stringValue: String(telegramChatId || '') },
-          priceList: { stringValue: String(priceList || 'Strzyżenie: 70 PLN, Broda: 50 PLN, Combo: 110 PLN') },
-          createdAt: { stringValue: new Date().toISOString() }
-        }
+      const docName = `projects/${projectId}/databases/(default)/documents/clients/${id}`;
+      const commitBody = {
+        writes: [
+          {
+            update: {
+              name: docName,
+              fields: {
+                clientId: { stringValue: id },
+                businessName: { stringValue: String(businessName || 'BarberShop Gentleman') },
+                assignedPhone: { stringValue: String(assignedPhone || '+19382539583') },
+                ownerEmail: { stringValue: String(ownerEmail || 'rvwshield@gmail.com') },
+                address: { stringValue: String(address || 'ul. Marszałkowska 10, Warszawa') },
+                workingHours: { stringValue: String(workingHours || 'Poniedziałek - Piątek: 09:00 - 20:00, Sobota: 10:00 - 16:00') },
+                googleCalendarId: { stringValue: String(googleCalendarId || '') },
+                googleSheetId: { stringValue: String(googleSheetId || '') },
+                telegramChatId: { stringValue: String(telegramChatId || '') },
+                priceList: { stringValue: String(priceList || 'Strzyżenie męskie klasyczne: 70 PLN (45 min), Strzyżenie brody: 50 PLN (30 min), Combo: 110 PLN (60 min)') },
+                createdAt: { stringValue: new Date().toISOString() }
+              }
+            }
+          }
+        ]
       };
 
-      const fsRes = await fetch(firestoreUrl, {
-        method: 'PATCH',
+      const fsRes = await fetch(commitUrl, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(firestoreDoc)
+        body: JSON.stringify(commitBody)
       });
 
       if (!fsRes.ok) {
