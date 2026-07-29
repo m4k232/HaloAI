@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   Activity, Users, CheckCircle, XCircle, Clock, Search, LogOut, RefreshCw,
-  Building2, Phone, Calendar, ArrowUpRight, ShieldCheck, Filter, Globe
+  Building2, Phone, Calendar, ArrowUpRight, ShieldCheck, Filter, Globe, Mic, Square
 } from 'lucide-react';
 import { fetchBookingsFromFirestore } from '../firebase';
 import { translations } from '../translations';
+import Vapi from '@vapi-ai/web';
+
+let vapiInstance = null;
 
 export default function Dashboard({ userSession, onLogout, lang, setLang }) {
   const [bookings, setBookings] = useState([]);
@@ -12,8 +15,68 @@ export default function Dashboard({ userSession, onLogout, lang, setLang }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [activeBusiness, setActiveBusiness] = useState('BarberShop Gentleman');
+  
+  // Vapi Web Call State
+  const [isCallActive, setIsCallActive] = useState(false);
+  const [isStartingCall, setIsStartingCall] = useState(false);
 
   const t = (translations[lang] || translations.pl).dashboard;
+
+  const startWebCall = async () => {
+    try {
+      setIsStartingCall(true);
+      
+      let publicKey = localStorage.getItem('VAPI_PUBLIC_KEY');
+      if (!publicKey) {
+        publicKey = prompt('Proszę podać Vapi Public Key (z zakładки API Keys w Vapi):');
+        if (!publicKey) {
+          setIsStartingCall(false);
+          return;
+        }
+        localStorage.setItem('VAPI_PUBLIC_KEY', publicKey);
+      }
+
+      // 1. Initialize Vapi
+      if (!vapiInstance) {
+        vapiInstance = new Vapi(publicKey);
+        vapiInstance.on('call-start', () => setIsCallActive(true));
+        vapiInstance.on('call-end', () => { setIsCallActive(false); setIsStartingCall(false); });
+        vapiInstance.on('error', (e) => { console.error('Vapi Error:', e); setIsCallActive(false); setIsStartingCall(false); });
+      }
+
+      // 2. Fetch the dynamic Assistant Override from our backend!
+      // This simulates exactly what happens during a phone call.
+      const res = await fetch('https://halo-ai-pink.vercel.app/api/vapi-inbound', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: {
+            type: 'assistant-request',
+            call: { phoneNumber: '+19382539583' }
+          }
+        })
+      });
+      
+      if (!res.ok) throw new Error('Błąd pobierania konfiguracji asystenta z backendu.');
+      
+      const data = await res.json();
+      
+      // 3. Start the call with the dynamically generated assistant config!
+      await vapiInstance.start(data.assistant);
+      
+      setIsStartingCall(false);
+    } catch (err) {
+      console.error('Failed to start web call:', err);
+      alert('Błąd podczas uruchamiania połączenia: ' + err.message);
+      setIsStartingCall(false);
+    }
+  };
+
+  const stopWebCall = () => {
+    if (vapiInstance) {
+      vapiInstance.stop();
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -128,14 +191,30 @@ export default function Dashboard({ userSession, onLogout, lang, setLang }) {
             </p>
           </div>
 
-          <button
-            onClick={loadData}
-            className="btn-secondary"
-            style={{ padding: '10px 18px', fontSize: '0.85rem', gap: 8, borderRadius: 10 }}
-          >
-            <RefreshCw size={15} className={loading ? 'spin' : ''} />
-            {t.refresh}
-          </button>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button
+              onClick={isCallActive ? stopWebCall : startWebCall}
+              disabled={isStartingCall}
+              className="btn-primary"
+              style={{
+                padding: '10px 18px', fontSize: '0.85rem', gap: 8, borderRadius: 10,
+                background: isCallActive ? '#f43f5e' : (isStartingCall ? '#4b5563' : '#3b82f6'),
+                color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center'
+              }}
+            >
+              {isCallActive ? <Square size={15} /> : <Mic size={15} />}
+              {isStartingCall ? 'Uruchamianie...' : (isCallActive ? 'Zakończ Połączenie Web' : 'Test Web Agent')}
+            </button>
+
+            <button
+              onClick={loadData}
+              className="btn-secondary"
+              style={{ padding: '10px 18px', fontSize: '0.85rem', gap: 8, borderRadius: 10 }}
+            >
+              <RefreshCw size={15} className={loading ? 'spin' : ''} />
+              {t.refresh}
+            </button>
+          </div>
         </div>
 
         {/* KPI Metrics Row */}
