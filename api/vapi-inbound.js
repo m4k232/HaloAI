@@ -1,4 +1,4 @@
-// Vapi Inbound Assistant Request Handler (Dynamic Prompt Injection from Firestore)
+// Vapi Inbound Assistant Request Handler (Dynamic Prompt & First Message Injection from Firestore)
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -18,15 +18,15 @@ export default async function handler(req, res) {
 
     const projectId = process.env.FIREBASE_PROJECT_ID || 'haloai-7b69d';
 
-    // 1. DEFAULT FALLBACK VALUES
+    // 1. DEFAULT FALLBACK METADATA
     let businessConfig = {
       businessName: 'BarberShop Gentleman',
       address: 'ul. Marszałkowska 10, Warszawa',
       workingHours: 'Poniedziałek - Piątek: 09:00 - 20:00, Sobota: 10:00 - 16:00',
-      priceList: 'Strzyżenie męskie klasyczne: 70 PLN, Strzyżenie brody: 50 PLN, Combo: 110 PLN, Dziecięce: 60 PLN'
+      priceList: 'Strzyżenie męskie klasyczne: 70 PLN (45 min), Strzyżenie brody: 50 PLN (30 min), Combo: 110 PLN (60 min)'
     };
 
-    // 2. FETCH REAL BUSINESS DATA FROM FIRESTORE 'clients' COLLECTION
+    // 2. FETCH REAL BUSINESS METADATA LIVE FROM FIRESTORE 'clients' COLLECTION
     try {
       const clientsUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/clients`;
       const cRes = await fetch(clientsUrl);
@@ -50,7 +50,9 @@ export default async function handler(req, res) {
       console.error('Error reading Firestore client config:', cErr);
     }
 
-    // 3. CONSTRUCT DYNAMIC DYNAMICALLY INJECTED SYSTEM PROMPT
+    // 3. CONSTRUCT DYNAMIC FIRST MESSAGE & SYSTEM PROMPT WITH FIRESTORE VARIABLES
+    const dynamicFirstMessage = `Dzień dobry! Z tej strony wirtualny asystent ${businessConfig.businessName}. Rozmowa jest nagrywana w celu rezerwacji wizyty. W czym mogę pomóc?`;
+
     const dynamicSystemPrompt = `# HALO AI - DYNAMIC VOICE ASSISTANT
 
 You are a warm, polite, and ultra-efficient Voice AI Receptionist representing "${businessConfig.businessName}".
@@ -62,8 +64,8 @@ Your job is to answer questions about services/prices and book appointments.
 - Start by detecting the caller's language and respond 100% in their language (Polish, Russian, Ukrainian, English, German, etc.).
 - If speaking Russian or Ukrainian, ALWAYS write in pure Cyrillic script. Never use Latin transliteration.
 
-[LIVE FIRESTORE BUSINESS INFO & PRICES]
-- Salon Name: ${businessConfig.businessName}
+[LIVE FIRESTORE BUSINESS METADATA]
+- Business Name: ${businessConfig.businessName}
 - Address: ${businessConfig.address}
 - Hours: ${businessConfig.workingHours}
 - Services & Price List: ${businessConfig.priceList}
@@ -85,9 +87,10 @@ You need 4 pieces of information to complete a booking:
 - After \`create_booking\` finishes executing, say: "Dziękuję! Wizyta została pomyślnie zarezerwowana. Do zobaczenia!" (or equivalent in caller's language) and END THE CALL.
 `;
 
-    // 4. RETURN DYNAMIC ASSISTANT OVERRIDE TO VAPI
+    // 4. RETURN DYNAMIC ASSISTANT OVERRIDE WITH FIRST MESSAGE TO VAPI
     return res.status(200).json({
       assistant: {
+        firstMessage: dynamicFirstMessage,
         model: {
           provider: 'openai',
           model: 'gpt-4o-mini',
