@@ -13,8 +13,16 @@ export default async function handler(req, res) {
   try {
     const body = req.body || {};
     const message = body.message || {};
+    
+    // ONLY HANDLE ASSISTANT-REQUEST (Triggered when a real phone call starts)
+    if (message.type !== 'assistant-request') {
+      // If Vapi sends status updates, transcriptions, etc., just acknowledge them with 200 OK.
+      return res.status(200).json({ success: true, ignoredType: message.type });
+    }
+
     const call = message.call || body.call || {};
     const calledPhoneNumber = call.phoneNumber || body.phoneNumber || '+19382539583';
+    const customerNumber = call.customer?.number || '';
 
     const projectId = process.env.FIREBASE_PROJECT_ID || 'haloai-7b69d';
 
@@ -80,7 +88,7 @@ You need 4 pieces of information to complete a booking:
 [PHONE NUMBER RULE]
 - You automatically have access to the caller's line \`call.customer.number\`.
 - When asking for the phone number, state: "Provide your phone number or say 'this number' to use the line you are calling from."
-- If the caller says "this number", "na ten numer", "на этот номер", or indicates using their current line, set \`phone\` to \`call.customer.number\`!
+- If the caller says "this number", "na ten numer", "на этот номер", or indicates using their current line, set \`phone\` to "${customerNumber}"!
 
 [BOOKING EXECUTION]
 - The EXACT MOMENT you have all 4 items (\`service\`, \`datetime\`, \`name\`, \`phone\`), IMMEDIATELY call the \`create_booking\` tool.
