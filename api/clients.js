@@ -63,8 +63,8 @@ export default async function handler(req, res) {
       } = req.body || {};
 
       const id = clientId || 'barbershop_gentleman';
-      // Using PATCH on the document URL updates existing fields or creates if missing
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/clients/${id}?updateMask.fieldPaths=businessName&updateMask.fieldPaths=assignedPhone&updateMask.fieldPaths=ownerEmail&updateMask.fieldPaths=address&updateMask.fieldPaths=workingHours&updateMask.fieldPaths=googleCalendarId&updateMask.fieldPaths=googleSheetId&updateMask.fieldPaths=telegramChatId&updateMask.fieldPaths=priceList&updateMask.fieldPaths=createdAt`;
+      // In Firestore REST API, using PATCH to /documents/clients/{id} creates or replaces document
+      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/clients/${id}`;
 
       const firestoreDoc = {
         fields: {
