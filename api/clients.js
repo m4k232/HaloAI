@@ -66,9 +66,12 @@ export default async function handler(req, res) {
       const commitUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:commit`;
 
       const docName = `projects/${projectId}/databases/(default)/documents/clients/${id}`;
+      const fieldPaths = ['clientId', 'businessName', 'assignedPhone', 'ownerEmail', 'address', 'workingHours', 'googleCalendarId', 'googleSheetId', 'telegramChatId', 'priceList', 'createdAt'];
+
       const commitBody = {
         writes: [
           {
+            updateMask: { fieldPaths },
             update: {
               name: docName,
               fields: {
